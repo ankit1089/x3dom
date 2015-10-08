@@ -55,6 +55,16 @@ x3dom.registerNodeType(
             //this.addField_SFVec3f(ctx, 'sliceThickness', 1, 1, 1);
 
             /**
+             * depthTexture holds the depth limits for ray termination.
+             * @var {x3dom.field.SFNode} depthTexture
+             * @memberof x3dom.nodeTypes.X3DVolumeDataNode
+             * @initvalue x3dom.nodeTypes.Texture
+             * @field x3dom 
+             * @instance 
+             */
+            this.addField_SFNode('depthTexture', x3dom.nodeTypes.Texture);
+            
+            /**
              * Allow to locate the viewpoint inside the volume.
              * @var {x3dom.fields.SFBool} allowViewpointInside
              * @memberof x3dom.nodeTypes.X3DVolumeDataNode
@@ -104,7 +114,7 @@ x3dom.registerNodeType(
                 "uniform mat4 modelViewProjectionMatrix;\n"+
                 "varying vec4 vertexPosition;\n"+
                 "varying vec4 pos;\n";
-                if(x3dom.nodeTypes.X3DLightNode.lightID>0){
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || this._cf.depthTexture.node){
                     shader += "uniform mat4 modelViewMatrix;\n"+
                     "varying vec4 position_eye;\n";
                 }
@@ -112,7 +122,7 @@ x3dom.registerNodeType(
                 "void main()\n"+
                 "{\n"+
                 "  vertexPosition = modelViewProjectionMatrix * vec4(position, 1.0);\n";
-                if(x3dom.nodeTypes.X3DLightNode.lightID>0){
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || this._cf.depthTexture.node){
                    shader += "  position_eye = modelViewMatrix * vec4(position, 1.0);\n";
                 }
                 shader += 
@@ -124,14 +134,19 @@ x3dom.registerNodeType(
 
             defaultUniformsShaderText: function(numberOfSlices, slicesOverX, slicesOverY){
                var uniformsText = 
-                "uniform sampler2D uVolData;\n"+
+                "uniform sampler2D uVolData;\n";
+               if(this._cf.depthTexture.node) {
+                    uniformsText += "uniform sampler2D uDepthTexture;\n"+
+                                    "uniform mat4 projectionMatrix;\n";
+               }
+               uniformsText +=
                 "uniform vec3 dimensions;\n"+
                 "uniform vec3 offset;\n"+
                 "uniform mat4 modelViewMatrix;\n"+
                 "uniform mat4 modelViewMatrixInverse;\n"+
                 "varying vec4 vertexPosition;\n"+
                 "varying vec4 pos;\n";
-                if(x3dom.nodeTypes.X3DLightNode.lightID>0){
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || this._cf.depthTexture.node){
                     uniformsText += "varying vec4 position_eye;\n";
                 }
                 //LIGHTS
@@ -220,17 +235,26 @@ x3dom.registerNodeType(
                 "  vec4 value  = vec4(0.0, 0.0, 0.0, 0.0);\n"+
                 "  float cont = 0.0;\n"+
                 "  vec3 step_size = dir/Steps;\n";
+                // depth test init values
+                if(this._cf.depthTexture.node) {
+                    shaderLoop +=
+                    "  float depth_limit = texture2D(uDepthTexture, 0.5*(vertexPosition.xy/vertexPosition.w) + 0.5).r;\n"+
+                    "  float depth_ray = 0.0;\n";
+                }
                 //Light init values
                 if(x3dom.nodeTypes.X3DLightNode.lightID>0){
                     shaderLoop +=
                     "  vec3 ambient = vec3(0.0, 0.0, 0.0);\n"+
                     "  vec3 diffuse = vec3(0.0, 0.0, 0.0);\n"+
                     "  vec3 specular = vec3(0.0, 0.0, 0.0);\n"+
-                    "  vec4 step_eye = modelViewMatrix * vec4(step_size, 0.0);\n"+
-                    "  vec4 positionE = position_eye;\n"+
                     "  float lightFactor = 1.0;\n"; 
                 }else{
                     shaderLoop += "  float lightFactor = 1.2;\n";
+                }
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || this._cf.depthTexture.node) {
+                    shaderLoop +=
+                    "  vec4 step_eye = modelViewMatrix * vec4(step_size, 0.0);\n"+
+                    "  vec4 positionE = position_eye;\n";
                 }
                 shaderLoop += initializeValues+
                 "  float opacityFactor = 10.0;\n"+
@@ -260,13 +284,25 @@ x3dom.registerNodeType(
                 "    accum.a += (1.0 - accum.a) * sample.a;\n"+
                 //Advance the current ray position
                 "    ray_pos.xyz += step_size;\n";
-                if(x3dom.nodeTypes.X3DLightNode.lightID>0){
+                if(this._cf.depthTexture.node) {
+                    shaderLoop +=
+                    "    depth_ray = (projectionMatrix[2][2] / (-2.0)) - (projectionMatrix[3][2] / ( 2.0 * positionE.z)) + 0.5;\n";
+                }
+                if(x3dom.nodeTypes.X3DLightNode.lightID>0 || this._cf.depthTexture.node){
                     shaderLoop +="    positionE += step_eye;\n";
                 }
+                //Early ray termination and Break if the position is greater than <1, 1, 1> or the ray encounters a polygon
+                if(this._cf.depthTexture.node) {
+                    shaderLoop +=
+                    "    if(depth_ray > depth_limit || accum.a >= 1.0 || ray_pos.x < 0.0 || ray_pos.y < 0.0 || ray_pos.z < 0.0 || ray_pos.x > 1.0 || ray_pos.y > 1.0 || ray_pos.z > 1.0)\n"+
+                    "      break;\n";
+                }
+                else {
+                    shaderLoop +=
+                    "    if(accum.a >= 1.0 || ray_pos.x < 0.0 || ray_pos.y < 0.0 || ray_pos.z < 0.0 || ray_pos.x > 1.0 || ray_pos.y > 1.0 || ray_pos.z > 1.0)\n"+
+                    "      break;\n";
+                }
                 shaderLoop +=
-                //Early ray termination and Break if the position is greater than <1, 1, 1>
-                "    if(accum.a >= 1.0 || ray_pos.x < 0.0 || ray_pos.y < 0.0 || ray_pos.z < 0.0 || ray_pos.x > 1.0 || ray_pos.y > 1.0 || ray_pos.z > 1.0)\n"+
-                "      break;\n"+
                 "  }\n"+
                 "  gl_FragColor = accum;\n"+
                 "}";

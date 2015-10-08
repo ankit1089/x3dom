@@ -141,6 +141,17 @@ x3dom.registerNodeType(
             this.addField_SFFloat(ctx, 'interpupillaryDistance', 0.064);
 
             /**
+             * Determines if textures shall be treated as depth map.
+             * If it is TRUE, then the generated texture will contain the depth buffer.
+             * @var {x3dom.fields.SFBool} depthMap
+             * @memberof x3dom.nodeTypes.RenderedTexture
+             * @initvalue false
+             * @field x3dom
+             * @instance
+             */
+            this.addField_SFBool(ctx, 'depthMap', false);
+
+            /**
              * Very experimental field to change between DK1 and DK2.
              * @var {x3dom.fields.SFFloat} oculusRiftVersion
              * @memberof x3dom.nodeTypes.RenderedTexture
@@ -165,6 +176,11 @@ x3dom.registerNodeType(
             this._clearParents = true;
             this._needRenderUpdate = true;
         
+            this.checkDepthTextureSupport = function() {
+                if(this._vf.depthMap && x3dom.caps.DEPTH_TEXTURE === null)
+                    x3dom.debug.logWarning("RenderedTexture Node: depth texture extension not supported");
+            };
+            this.checkDepthTextureSupport();
         },
         {
             nodeChanged: function()
@@ -185,6 +201,11 @@ x3dom.registerNodeType(
                             this._vf.update.toUpperCase() == "ALWAYS") {
                             this._needRenderUpdate = true;
                         }
+                        break;
+                    case "depthMap":
+                        this.checkDepthTextureSupport();
+                        this._x3domTexture.updateTexture();
+                        this._needRenderUpdate = true;
                         break;
                     default:
                         // TODO: dimensions

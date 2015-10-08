@@ -43,12 +43,14 @@ x3dom.registerNodeType(
 
             this.vrcMultiTexture = new x3dom.nodeTypes.MultiTexture(ctx);
             this.vrcVolumeTexture = null;
+            this.vrcDepthTexture = null;
 
             this.vrcSinglePassShader = new x3dom.nodeTypes.ComposedShader(ctx);
             this.vrcSinglePassShaderVertex = new x3dom.nodeTypes.ShaderPart(ctx);
             this.vrcSinglePassShaderFragment = new x3dom.nodeTypes.ShaderPart(ctx);
             this.vrcSinglePassShaderFieldBackCoord = new x3dom.nodeTypes.Field(ctx);
             this.vrcSinglePassShaderFieldVolData = new x3dom.nodeTypes.Field(ctx);
+            this.vrcSinglePassShaderFieldDepthTexture = new x3dom.nodeTypes.Field(ctx);
             this.vrcSinglePassShaderFieldOffset = new x3dom.nodeTypes.Field(ctx);
             this.vrcSinglePassShaderFieldDimensions = new x3dom.nodeTypes.Field(ctx);
         
@@ -118,6 +120,16 @@ x3dom.registerNodeType(
                     this.vrcMultiTexture.addChild(this.vrcVolumeTexture, 'texture');
                     this.vrcVolumeTexture.nodeChanged();
                     
+                    if(this._cf.depthTexture.node) {
+                        // create shortcut to depth data set
+                        this.vrcDepthTexture = this._cf.depthTexture.node;
+                        this.vrcDepthTexture._vf.repeatS = false;
+                        this.vrcDepthTexture._vf.repeatT = false;
+                        
+                        this.vrcMultiTexture.addChild(this.vrcDepthTexture, 'texture');
+                        this.vrcDepthTexture.nodeChanged();
+                    }
+                    
                     // textures from styles
                     if (this._cf.renderStyle.node.textures) {
                         var styleTextures = this._cf.renderStyle.node.textures();
@@ -167,6 +179,12 @@ x3dom.registerNodeType(
                     this.vrcSinglePassShaderFieldVolData._vf.type = 'SFInt32';
                     this.vrcSinglePassShaderFieldVolData._vf.value = this._textureID++;
 
+                    if(this._cf.depthTexture.node) {
+                        this.vrcSinglePassShaderFieldDepthTexture._vf.name = 'uDepthTexture';
+                        this.vrcSinglePassShaderFieldDepthTexture._vf.type = 'SFInt32';
+                        this.vrcSinglePassShaderFieldDepthTexture._vf.value = this._textureID++;
+                    }
+
                     this.vrcSinglePassShaderFieldDimensions._vf.name = 'dimensions';
                     this.vrcSinglePassShaderFieldDimensions._vf.type = 'SFVec3f';
                     this.vrcSinglePassShaderFieldDimensions._vf.value = this._vf.dimensions;
@@ -177,6 +195,11 @@ x3dom.registerNodeType(
                     
                     this.vrcSinglePassShader.addChild(this.vrcSinglePassShaderFieldVolData, 'fields');
                     this.vrcSinglePassShaderFieldVolData.nodeChanged();
+
+                    if(this._cf.depthTexture.node) {
+                        this.vrcSinglePassShader.addChild(this.vrcSinglePassShaderFieldDepthTexture, 'fields');
+                        this.vrcSinglePassShaderFieldDepthTexture.nodeChanged();
+                    }
 
                     this.vrcSinglePassShader.addChild(this.vrcSinglePassShaderFieldDimensions, 'fields');
                     this.vrcSinglePassShaderFieldDimensions.nodeChanged();
