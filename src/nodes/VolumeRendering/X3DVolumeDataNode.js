@@ -62,6 +62,10 @@ x3dom.registerNodeType(
              * @field x3dom 
              * @instance 
              */
+            /**
+             * (C)2014 Toshiba Corporation, Japan.
+             * Dual licensed under the MIT and GPL.
+             */
             this.addField_SFNode('depthTexture', x3dom.nodeTypes.Texture);
             
             /**

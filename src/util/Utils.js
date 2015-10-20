@@ -510,6 +510,9 @@ x3dom.Utils.initFBO = function(gl, w, h, type, mipMap, needDepthBuf, numMrt) {
     var dtex = null;
     var rb = null;
 
+    // Added code for generation of depth texture.
+    // (C)2014 Toshiba Corporation, Japan.
+    // Dual licensed under the MIT and GPL.
     if (needDepthBuf) {
         if(x3dom.caps.DEPTH_TEXTURE !== null) {
             dtex = gl.createTexture();
